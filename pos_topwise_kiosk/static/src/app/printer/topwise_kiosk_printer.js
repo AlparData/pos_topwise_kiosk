@@ -30,6 +30,10 @@ function buildKitchenReceipt(receiptEl) {
     title.textContent = "TICKET DE PREPARACIÓN";
     clone.prepend(title);
 
+    // Remove the company logo — html2canvas can't reliably re-fetch relative
+    // image URLs in the WebView, causing a broken-image "camera" icon.
+    clone.querySelectorAll(".pos-receipt-logo, img").forEach(el => el.remove());
+
     // Remove per-line price badges (right-aligned price column)
     clone.querySelectorAll(".product-price, .price").forEach(el => el.remove());
 
