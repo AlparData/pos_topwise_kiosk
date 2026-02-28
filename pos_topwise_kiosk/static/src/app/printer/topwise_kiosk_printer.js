@@ -18,14 +18,15 @@ patch(SelfOrder.prototype, {
                         const canvas = await htmlToCanvas(receiptHtml, { addClass: "pos-receipt-print" });
                         const base64Image = canvas.toDataURL("image/jpeg").replace("data:image/jpeg;base64,", "");
                         
-                        if (window.TopWiseKiosk.printImage) {
+                        try {
                             window.TopWiseKiosk.printImage(base64Image);
-                        } else {
+                        } catch (e) {
                             // Fallback to text printing if app not updated yet
-                            console.warn("window.TopWiseKiosk.printImage not found, falling back to printTicket (HTML String)");
+                            console.warn("window.TopWiseKiosk.printImage failed or not found, falling back to printTicket (HTML String)", e);
                             const receiptString = receiptHtml instanceof HTMLElement ? receiptHtml.outerHTML : String(receiptHtml);
                             window.TopWiseKiosk.printTicket(receiptString);
                         }
+                        
                         return { successful: true };
                     } catch (error) {
                         console.error("Failed to print via TopWise Kiosk:", error);
