@@ -15,6 +15,9 @@ It injects a script into the frontend that intercepts printing and routes it to 
             'pos_topwise_kiosk/static/src/app/printer/topwise_printer.js',
             'pos_topwise_kiosk/static/src/app/barcode/topwise_barcode_reader.js',
         ],
+        'pos_self_order.assets': [
+            'pos_topwise_kiosk/static/src/app/printer/topwise_kiosk_printer.js',
+        ],
     },
     'installable': True,
     'application': False,
