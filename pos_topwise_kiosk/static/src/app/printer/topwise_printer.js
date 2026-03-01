@@ -1,9 +1,9 @@
 /** @odoo-module */
 
-import { Printer } from "@point_of_sale/app/printer/printer";
+import { BasePrinter } from "@point_of_sale/app/printer/base_printer";
 import { patch } from "@web/core/utils/patch";
 
-patch(Printer.prototype, {
+patch(BasePrinter.prototype, {
     /**
      * Override printReceipt to intercept and send to TopWise Kiosk if present.
      */

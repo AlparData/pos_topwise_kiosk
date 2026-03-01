@@ -1,6 +1,6 @@
 /** @odoo-module */
 
-import { BarcodeReader } from "@point_of_sale/app/barcode/barcode_reader";
+import { BarcodeReader } from "@point_of_sale/app/barcode/barcode_reader_service";
 import { patch } from "@web/core/utils/patch";
 
 patch(BarcodeReader.prototype, {
