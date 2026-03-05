@@ -16,7 +16,56 @@ async function sendToTopWisePrinter(el) {
     window.TopWiseKiosk.printImage(base64Image);
 }
 
-// Removed buildKitchenReceipt as we now use native kitchen printers
+/**
+ * Clones the receipt element and strips all monetary information,
+ * producing a "Kitchen / Prep Ticket" DOM node suitable for printing.
+ */
+function buildKitchenReceipt(receiptEl) {
+    const clone = receiptEl.cloneNode(true);
+
+    // Add a clearly visible "PREP TICKET" heading at the top
+    const title = document.createElement("h2");
+    title.style.cssText = "text-align:center; font-weight:bold; font-size:28px; "
+        + "padding:8px 0; border-bottom:2px dashed #000; margin-bottom:8px;";
+    title.textContent = "TICKET DE PREPARACIÓN";
+    clone.prepend(title);
+
+    // Remove the company logo — html2canvas can't reliably re-fetch relative
+    // image URLs in the WebView, causing a broken-image "camera" icon.
+    clone.querySelectorAll(".pos-receipt-logo, img").forEach(el => el.remove());
+
+    // Remove per-line price badges (right-aligned price column)
+    clone.querySelectorAll(".product-price, .price").forEach(el => el.remove());
+
+    // On each ".price-per-unit" line keep only the quantity badge, strip unit prices
+    // Original: <span class="qty ...">1</span> x $3.63 / Unidades
+    clone.querySelectorAll(".price-per-unit").forEach(el => {
+        const qtySpan = el.querySelector(".qty");
+        el.innerHTML = "";
+        if (qtySpan) {
+            qtySpan.style.fontSize = "20px";
+            el.appendChild(qtySpan);
+        }
+    });
+
+    // Remove: tax breakdown section
+    clone.querySelectorAll(".pos-receipt-taxes").forEach(el => el.remove());
+
+    // Remove: TOTAL row
+    clone.querySelectorAll(".pos-receipt-amount, .receipt-total").forEach(el => el.remove());
+
+    // Remove: payment method lines
+    clone.querySelectorAll(".pos-receipt-payment, .paymentlines").forEach(el => el.remove());
+
+    // Remove "Powered by Odoo" footers
+    clone.querySelectorAll(".pos-receipt-order-data").forEach(el => {
+        if (el.querySelector("p")?.textContent.includes("Odoo")) {
+            el.remove();
+        }
+    });
+
+    return clone;
+}
 
 patch(SelfOrder.prototype, {
     async setup() {
@@ -25,22 +74,28 @@ patch(SelfOrder.prototype, {
         if (window.TopWiseKiosk) {
             console.log("TopWiseKiosk: detected, setting up smart dual-receipt printer.");
 
-            // 1. Customer Receipt Interception
             this.printer.setPrinter({
                 printReceipt: async (receiptEl) => {
                     try {
+                        // Detect whether the customer paid at the kiosk by
+                        // looking for the payment section Odoo adds to paid receipts.
                         const paidAtKiosk = receiptEl.querySelector?.(".paymentlines") !== null;
 
                         if (paidAtKiosk) {
-                            console.log("TopWiseKiosk: Paid at kiosk → printing CUSTOMER receipt.");
+                            // 1. Print the full customer receipt
+                            console.log("TopWiseKiosk: Paid at kiosk → printing FULL receipt then KITCHEN ticket.");
                             await sendToTopWisePrinter(receiptEl);
                         } else {
-                            console.log("TopWiseKiosk: Pay at register → skipping CUSTOMER receipt.");
+                            console.log("TopWiseKiosk: Pay at register → printing KITCHEN ticket only.");
                         }
+
+                        // Always print the simplified kitchen ticket
+                        const kitchenEl = buildKitchenReceipt(receiptEl);
+                        await sendToTopWisePrinter(kitchenEl);
 
                         return { successful: true };
                     } catch (error) {
-                        console.error("TopWiseKiosk: Failed to print customer receipt:", error);
+                        console.error("TopWiseKiosk: Failed to print receipt:", error);
                         return {
                             successful: false,
                             message: { title: "Printing failed", body: error.toString() }
@@ -48,28 +103,6 @@ patch(SelfOrder.prototype, {
                     }
                 }
             });
-
-            // 2. Kitchen Printer Interception
-            // We intercept all kitchen printers so that the single-ticket logic
-            // natively routes its outputs to the TopWise Android scanner app.
-            for (const printer of this.kitchenPrinters) {
-                // If the user has multiple kitchen printers (e.g. one for Food (IoT), one for Drinks Kiosk), 
-                // we should theoretically only intercept the Kiosk one. 
-                // For now, we route them all to TopWise to support immediate testing and direct printing.
-                printer.printReceipt = async (receiptEl) => {
-                    try {
-                        console.log("TopWiseKiosk: Routing native kitchen printer job to TopWise!");
-                        await sendToTopWisePrinter(receiptEl);
-                        return { successful: true };
-                    } catch (error) {
-                        console.error("TopWiseKiosk: Failed to print kitchen receipt:", error);
-                        return {
-                            successful: false,
-                            message: { title: "Kitchen Printing failed", body: error.toString() }
-                        };
-                    }
-                };
-            }
         }
     }
 });
